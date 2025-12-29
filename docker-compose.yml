@@ -3,47 +3,20 @@ version: '3.8'
 services:
   backend:
     build: ./backend
-    container_name: appharmonia-backend
-    ports:
-      - "3001:3001"
+    ports: ["3001:3001"]
     environment:
       NODE_ENV: production
       PORT: 3001
-      JWT_SECRET: ${JWT_SECRET:-secretharmonia123}
+      JWT_SECRET: secretharmonia123
       CORS_ORIGIN: http://localhost:3000
     volumes:
-      - backend_uploads:/app/uploads
-      - backend_database:/app/database
+      - ./backend/uploads:/app/uploads
+      - ./backend/database:/app/database
     restart: unless-stopped
-    networks:
-      - harmonia-network
-    healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/api/salut', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
   frontend:
     build: ./frontend
-    container_name: appharmonia-frontend
-    ports:
-      - "3000:80"
-    environment:
-      VITE_API_URL: /api
-      VITE_APP_NAME: appHarmonia
+    ports: ["3000:80"]
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
     restart: unless-stopped
-    networks:
-      - harmonia-network
-
-volumes:
-  backend_uploads:
-    driver: local
-  backend_database:
-    driver: local
-
-networks:
-  harmonia-network:
-    driver: bridge

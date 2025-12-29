@@ -1,36 +1,34 @@
-# frontend/Dockerfile
-# Etapa de construcció
 FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Copiar fitxers de configuració
+# Copiar package.json i lockfile si existeix
 COPY package*.json ./
-COPY tsconfig*.json ./
-COPY vite.config.ts ./
 
-# Instal·lar dependències
-RUN npm ci
+# Instal·lar dependencies (si no hi ha lockfile, crea'l)
+RUN if [ -f package-lock.json ]; then \
+      npm ci --no-audit --progress=false; \
+    else \
+      npm config set legacy-peer-deps true && \
+      npm install --no-audit --progress=false --legacy-peer-deps; \
+    fi
 
-# Copiar codi font
-COPY public/ ./public/
-COPY src/ ./src/
-COPY index.html ./
+# Copiar la resta
+COPY . .
 
-# Construir l'aplicació
+# Construir
 RUN npm run build
 
-# Etapa de producció
 FROM nginx:alpine
 
-# Copiar configuració de nginx
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Configuració nginx si no existeix el fitxer
+RUN if [ ! -f /etc/nginx/conf.d/default.conf ]; then \
+      echo 'server { listen 80; root /usr/share/nginx/html; location / { try_files \$uri \$uri/ /index.html; } }' \
+      > /etc/nginx/conf.d/default.conf; \
+    fi
 
-# Copiar l'aplicació construïda
+COPY nginx.conf /etc/nginx/conf.d/default.conf 2>/dev/null || true
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Exposar port
 EXPOSE 80
-
-# Iniciar nginx
 CMD ["nginx", "-g", "daemon off;"]
