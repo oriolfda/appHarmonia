@@ -1,0 +1,15 @@
+# Backend
+backend/node_modules/
+backend/uploads/
+backend/database/*.db
+backend/package-lock.json
+
+# Frontend
+frontend/node_modules/
+frontend/package-lock.json
+frontend/dist/
+
+# General
+.DS_Store
+.env
+*.log

@@ -1,0 +1,179 @@
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { partituresAPI, Partitura } from '../services/api';
+
+const PartituresList: React.FC = () => {
+  const [partitures, setPartitures] = useState<Partitura[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    pages: 1
+  });
+
+  useEffect(() => {
+    loadPartitures();
+  }, [pagination.page]);
+
+  const loadPartitures = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await partituresAPI.getAll(pagination.page, pagination.limit);
+      setPartitures(data.partitures);
+      setPagination(data.paginacio);
+    } catch (err: any) {
+      setError(err.message || 'Error carregant partitures');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!window.confirm('Estàs segur que vols eliminar aquesta partitura?')) {
+      return;
+    }
+
+    try {
+      await partituresAPI.delete(id);
+      setPartitures(partitures.filter(p => p.id !== id));
+    } catch (err: any) {
+      alert(err.message || 'Error eliminant partitura');
+    }
+  };
+
+  if (loading && partitures.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        <p className="mt-2 text-gray-600">Carregant partitures...</p>
+      </div>
+    );
+  }
+
+  if (error && partitures.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <div className="text-red-500 mb-2">❌ {error}</div>
+        <button 
+          onClick={loadPartitures}
+          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+        >
+          Tornar a intentar
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-xl font-bold">Partitures disponibles</h2>
+        <button 
+          onClick={loadPartitures}
+          className="px-4 py-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 flex items-center gap-2"
+        >
+          <span>🔄</span> Actualitzar
+        </button>
+      </div>
+
+      {partitures.length === 0 ? (
+        <div className="text-center py-12 bg-white rounded-lg shadow">
+          <div className="text-5xl mb-4">🎼</div>
+          <h3 className="text-xl font-semibold mb-2">Encara no hi ha partitures</h3>
+          <p className="text-gray-600 mb-4">Sigues el primer a pujar una partitura!</p>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {partitures.map((partitura) => (
+              <Link 
+                key={partitura.id} 
+                to={`/partitura/${partitura.id}`}
+                className="bg-white rounded-lg shadow hover:shadow-md transition-shadow block"
+              >
+                <div className="p-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="font-bold text-lg truncate">{partitura.titol}</h3>
+                    <span className="text-xs text-gray-500 whitespace-nowrap">
+                      {new Date(partitura.creat_a).toLocaleDateString('ca-ES')}
+                    </span>
+                  </div>
+                  
+                  {partitura.descripcio && (
+                    <p className="text-gray-600 text-sm mb-3 line-clamp-2">
+                      {partitura.descripcio}
+                    </p>
+                  )}
+                  
+                  <div className="flex items-center justify-between text-sm text-gray-500">
+                    <div className="flex items-center gap-4">
+                      <span className="flex items-center gap-1">
+                        👤 {partitura.nom_display || partitura.nom_usuari}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        ✏️ {partitura.anotacions_count}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        💬 {partitura.comentaris_count}
+                      </span>
+                    </div>
+                    
+                    {!partitura.publica && (
+                      <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                        Privada
+                      </span>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="h-48 overflow-hidden rounded-b-lg">
+                  <img 
+                    src={partitura.imatge_url} 
+                    alt={partitura.titol}
+                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                    loading="lazy"
+                  />
+                </div>
+              </Link>
+            ))}
+          </div>
+
+          {/* Paginació */}
+          {pagination.pages > 1 && (
+            <div className="mt-8 flex justify-center gap-2">
+              <button
+                onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                disabled={pagination.page === 1}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                ← Anterior
+              </button>
+              
+              <div className="flex items-center px-4">
+                <span className="text-gray-700">
+                  Pàgina {pagination.page} de {pagination.pages}
+                </span>
+              </div>
+              
+              <button
+                onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                disabled={pagination.page === pagination.pages}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Següent →
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+};
+
+export default PartituresList;
