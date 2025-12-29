@@ -11,6 +11,20 @@ import {
   authAPI 
 } from '../services/api';
 
+// Funció auxiliar per evitar problemes de tipus amb Fabric.js
+const setObjectProperty = (obj: fabric.Object, property: string, value: any): void => {
+  const fabricObj = obj as any;
+  if (typeof fabricObj.set === 'function') {
+    try {
+      fabricObj.set(property, value);
+    } catch (e) {
+      fabricObj[property] = value;
+    }
+  } else {
+    fabricObj[property] = value;
+  }
+};
+
 const PartituraViewer: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -68,6 +82,56 @@ const PartituraViewer: React.FC = () => {
     }
   };
 
+  // Carregar anotacions al canvas
+  const carregarAnotacionsAlCanvas = (fabricCanvas: fabric.Canvas) => {
+    anotacions.forEach(anotacio => {
+      try {
+        fabricCanvas.loadFromJSON(anotacio.dades_anotacio, () => {
+          fabricCanvas.getObjects().forEach(obj => {
+            if (anotacio.color) {
+              const objType = obj.type || '';
+              
+              switch (objType) {
+                case 'line':
+                  setObjectProperty(obj, 'stroke', anotacio.color);
+                  break;
+                case 'textbox':
+                case 'i-text':
+                case 'text':
+                  setObjectProperty(obj, 'fill', anotacio.color);
+                  break;
+                case 'rect':
+                case 'circle':
+                case 'ellipse':
+                  setObjectProperty(obj, 'fill', 'transparent');
+                  setObjectProperty(obj, 'stroke', anotacio.color);
+                  break;
+                case 'path':
+                  setObjectProperty(obj, 'stroke', anotacio.color);
+                  break;
+                default:
+                  // Intentar assignar propietats comunes
+                  if ('stroke' in obj) {
+                    setObjectProperty(obj, 'stroke', anotacio.color);
+                  }
+                  if ('fill' in obj && objType !== 'image') {
+                    setObjectProperty(obj, 'fill', anotacio.color);
+                  }
+              }
+            }
+            
+            // Desactivar interacció
+            setObjectProperty(obj, 'selectable', false);
+            setObjectProperty(obj, 'evented', false);
+          });
+          fabricCanvas.renderAll();
+        });
+      } catch (error) {
+        console.error('Error carregant anotació al canvas:', error);
+      }
+    });
+  };
+
   // Inicialitzar canvas
   useEffect(() => {
     if (!canvasRef.current || !partitura) return;
@@ -111,37 +175,6 @@ const PartituraViewer: React.FC = () => {
       }
     };
   }, [partitura]);
-
-  // Carregar anotacions al canvas
-  const carregarAnotacionsAlCanvas = (fabricCanvas: fabric.Canvas) => {
-    anotacions.forEach(anotacio => {
-      try {
-        fabricCanvas.loadFromJSON(anotacio.dades_anotacio, () => {
-          // Aplicar estils específics per a cada objecte
-          fabricCanvas.getObjects().forEach(obj => {
-            // Mantenir les propietats originals
-            if (anotacio.color) {
-              if (obj instanceof fabric.Line) {
-                obj.set('stroke', anotacio.color);
-              } else if (obj instanceof fabric.Textbox || obj instanceof fabric.IText) {
-                obj.set('fill', anotacio.color);
-              } else if (obj instanceof fabric.Rect || obj instanceof fabric.Circle) {
-                obj.set('fill', 'transparent');
-                obj.set('stroke', anotacio.color);
-              }
-            }
-            
-            // Fer les anotacions no seleccionables (només visualització)
-            obj.set('selectable', false);
-            obj.set('evented', false);
-          });
-          fabricCanvas.renderAll();
-        });
-      } catch (error) {
-        console.error('Error carregant anotació al canvas:', error);
-      }
-    });
-  };
 
   // Configurar eina seleccionada
   useEffect(() => {
